@@ -635,6 +635,42 @@ decorReleaseDecorations (CompScreen   *screen,
     }
 }
 
+static Bool
+decorWindowShouldDecorate(CompWindow *w)
+{
+    Bool	     decorate = FALSE;
+    CompMatch	     *match;
+
+    DECOR_DISPLAY (w->screen->display);
+
+    switch (w->type) {
+    case CompWindowTypeDialogMask:
+    case CompWindowTypeModalDialogMask:
+    case CompWindowTypeUtilMask:
+    case CompWindowTypeMenuMask:
+    case CompWindowTypeNormalMask:
+	if (w->mwmDecor & (MwmDecorAll | MwmDecorTitle))
+	    decorate = TRUE;
+    default:
+	break;
+    }
+
+    if (w->wmType & (CompWindowTypeDockMask | CompWindowTypeDesktopMask))
+	decorate = FALSE;
+
+    if (w->attrib.override_redirect)
+	decorate = FALSE;
+
+    if (decorate)
+    {
+	match = &dd->opt[DECOR_DISPLAY_OPTION_DECOR_MATCH].value.match;
+	if (!matchEval (match, w))
+	    decorate = FALSE;
+    }
+
+    return decorate;
+}
+
 static Decoration **
 decorUpdateDecorations (CompScreen   *screen,
 			Window       id,
@@ -754,6 +790,13 @@ decorWindowUpdateDecoration (CompWindow *w)
     DECOR_DISPLAY (w->screen->display);
     DECOR_WINDOW (w);
 
+    if (!decorWindowShouldDecorate(w))
+    {
+	if (dw->decors && dw->decorNum > 0)
+	decorReleaseDecorations (w->screen, dw->decors, &dw->decorNum);
+	dw->decors = NULL;
+    }
+    else
     dw->decors = decorUpdateDecorations (w->screen, w->id,
 					 dd->winDecorAtom,
 					 dw->decors, &dw->decorNum);
@@ -1222,30 +1265,7 @@ decorWindowUpdate (CompWindow *w,
     wd = dw->wd;
     old = (wd) ? wd->decor : NULL;
 
-    switch (w->type) {
-    case CompWindowTypeDialogMask:
-    case CompWindowTypeModalDialogMask:
-    case CompWindowTypeUtilMask:
-    case CompWindowTypeMenuMask:
-    case CompWindowTypeNormalMask:
-	if (w->mwmDecor & (MwmDecorAll | MwmDecorTitle))
-	    decorate = TRUE;
-    default:
-	break;
-    }
-
-    if (w->wmType & (CompWindowTypeDockMask | CompWindowTypeDesktopMask))
-	decorate = FALSE;
-
-    if (w->attrib.override_redirect)
-	decorate = FALSE;
-
-    if (decorate)
-    {
-	match = &dd->opt[DECOR_DISPLAY_OPTION_DECOR_MATCH].value.match;
-	if (!matchEval (match, w))
-	    decorate = FALSE;
-    }
+    decorate = decorWindowShouldDecorate (w);
 
     if (decorate)
     {
@@ -1935,6 +1955,7 @@ decorMatchPropertyChanged (CompDisplay *d,
 {
     DECOR_DISPLAY (d);
 
+    decorWindowUpdateDecoration (w);
     decorWindowUpdate (w, TRUE);
 
     UNWRAP (dd, d, matchPropertyChanged);
