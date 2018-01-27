@@ -1819,7 +1819,10 @@ decorSetDisplayOption (CompPlugin      *plugin,
 
 	    for (s = display->screens; s; s = s->next)
 		for (w = s->windows; w; w = w->next)
+		{
+		    decorWindowUpdateDecoration (w);
 		    decorWindowUpdate (w, TRUE);
+		}
 	}
 	break;
     default:
